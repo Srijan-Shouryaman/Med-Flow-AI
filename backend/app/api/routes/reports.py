@@ -37,15 +37,11 @@ async def upload_report(
 ):
     patient = db.execute(
         text("""
-            SELECT
-                patient_id,
-                patient_ref_id
+            SELECT patient_id, patient_ref_id
             FROM patients
             WHERE patient_id = :patient_id
         """),
-        {
-            "patient_id": patient_id
-        }
+        {"patient_id": patient_id}
     ).mappings().fetchone()
 
     if patient is None:
@@ -59,45 +55,22 @@ async def upload_report(
     result = db.execute(
         text("""
             INSERT INTO reports (
-                patient_id,
-                original_filename,
-                stored_filename,
-                file_path,
-                content_type,
-                file_size,
-                sha256_hash,
-                extracted_text,
-                extraction_status,
-                extraction_error,
+                patient_id, original_filename, stored_filename,
+                file_path, content_type, file_size, sha256_hash,
+                extracted_text, extraction_status, extraction_error,
                 uploaded_by
             )
             VALUES (
-                :patient_id,
-                :original_filename,
-                :stored_filename,
-                :file_path,
-                :content_type,
-                :file_size,
-                :sha256_hash,
-                NULL,
-                'PENDING',
-                NULL,
-                :uploaded_by
+                :patient_id, :original_filename, :stored_filename,
+                :file_path, :content_type, :file_size, :sha256_hash,
+                NULL, 'PENDING', NULL, :uploaded_by
             )
             RETURNING
-                report_id,
-                patient_id,
-                original_filename,
-                stored_filename,
-                file_path,
-                content_type,
-                file_size,
-                sha256_hash,
-                extracted_text,
-                extraction_status,
-                extraction_error,
-                uploaded_by,
-                uploaded_at
+                report_id, patient_id, original_filename,
+                stored_filename, file_path, content_type,
+                file_size, sha256_hash, extracted_text,
+                extraction_status, extraction_error,
+                uploaded_by, uploaded_at
         """),
         {
             "patient_id": patient_id,
@@ -112,8 +85,10 @@ async def upload_report(
     )
 
     report = result.mappings().fetchone()
-
+    report_id = report["report_id"]
     db.commit()
+
+    case_id = None
 
     try:
         extraction_result = extract_report_text(
@@ -136,155 +111,107 @@ async def upload_report(
         result = db.execute(
             text("""
                 UPDATE reports
-                SET
-                    extracted_text = :extracted_text,
+                SET extracted_text = :extracted_text,
                     extraction_status = 'EXTRACTED',
                     extraction_error = NULL
                 WHERE report_id = :report_id
                 RETURNING
-                    report_id,
-                    patient_id,
-                    original_filename,
-                    stored_filename,
-                    file_path,
-                    content_type,
-                    file_size,
-                    sha256_hash,
-                    extracted_text,
-                    extraction_status,
-                    extraction_error,
-                    uploaded_by,
-                    uploaded_at
+                    report_id, patient_id, original_filename,
+                    stored_filename, file_path, content_type,
+                    file_size, sha256_hash, extracted_text,
+                    extraction_status, extraction_error,
+                    uploaded_by, uploaded_at
             """),
             {
                 "extracted_text": extracted_text,
-                "report_id": report["report_id"],
+                "report_id": report_id,
             }
         )
 
         report = result.mappings().fetchone()
 
-        case_number_result = db.execute(
+        next_case_number = db.execute(
             text("""
                 SELECT COALESCE(
                     MAX(
-                        CAST(
-                            SUBSTRING(case_id FROM 2)
-                            AS INTEGER
-                        )
+                        CAST(SUBSTRING(case_id FROM 2) AS INTEGER)
                     ),
                     0
                 ) + 1
                 FROM cases
                 WHERE case_id ~ '^C[0-9]+$'
             """)
-        )
+        ).scalar_one()
 
-        next_case_number = case_number_result.scalar_one()
         case_id = f"C{next_case_number:04d}"
 
         db.execute(
             text("""
                 INSERT INTO cases (
-                    case_id,
-                    patient_ref_id,
-                    report_summary,
-                    report_id
+                    case_id, patient_ref_id, report_summary, report_id
                 )
                 VALUES (
-                    :case_id,
-                    :patient_ref_id,
-                    :report_summary,
-                    :report_id
+                    :case_id, :patient_ref_id, :report_summary, :report_id
                 )
             """),
             {
                 "case_id": case_id,
                 "patient_ref_id": patient["patient_ref_id"],
                 "report_summary": ml_text,
-                "report_id": report["report_id"],
+                "report_id": report_id,
             }
         )
 
         db.commit()
 
     except Exception as exc:
-
         db.rollback()
 
-        result = db.execute(
-            text("""
-                UPDATE reports
-                SET
-                    extraction_status = 'FAILED',
-                    extraction_error = :extraction_error
-                WHERE report_id = :report_id
-                RETURNING
-                    report_id,
-                    patient_id,
-                    original_filename,
-                    stored_filename,
-                    file_path,
-                    content_type,
-                    file_size,
-                    sha256_hash,
-                    extracted_text,
-                    extraction_status,
-                    extraction_error,
-                    uploaded_by,
-                    uploaded_at
-            """),
-            {
-                "extraction_error": str(exc),
-                "report_id": report["report_id"],
-            }
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(
+            "Report processing failed for report_id=%s",
+            report_id
         )
 
-        report = result.mappings().fetchone()
+        try:
+            result = db.execute(
+                text("""
+                    UPDATE reports
+                    SET extraction_status = 'FAILED',
+                        extraction_error = :extraction_error
+                    WHERE report_id = :report_id
+                    RETURNING
+                        report_id, patient_id, original_filename,
+                        stored_filename, file_path, content_type,
+                        file_size, sha256_hash, extracted_text,
+                        extraction_status, extraction_error,
+                        uploaded_by, uploaded_at
+                """),
+                {
+                    "extraction_error": str(exc)[:2000],
+                    "report_id": report_id,
+                }
+            )
 
-        db.commit()
+            report = result.mappings().fetchone()
+            db.commit()
 
-    return report
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Failed to save extraction failure status for report_id=%s",
+                report_id
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Report processing failed"
+            )
 
+    response = dict(report)
+    response["case_id"] = case_id
 
-@router.get("/")
-def get_reports(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    result = db.execute(
-        text("""
-            SELECT
-                r.report_id,
-                r.patient_id,
-                p.patient_ref_id,
-                p.full_name AS patient_name,
-                c.case_id,
-                r.original_filename,
-                r.stored_filename,
-                r.content_type,
-                r.file_size,
-                r.sha256_hash,
-                r.extraction_status,
-                r.extraction_error,
-                r.uploaded_by,
-                r.uploaded_at
-            FROM reports r
-            INNER JOIN patients p
-                ON p.patient_id = r.patient_id
-            LEFT JOIN cases c
-                ON c.report_id = r.report_id
-            ORDER BY
-                r.uploaded_at DESC,
-                r.report_id DESC
-        """)
-    )
-
-    return [
-        dict(row)
-        for row in result.mappings().all()
-    ]
-
+    return response
 
 @router.get("/{report_id}")
 def get_report(
@@ -332,3 +259,42 @@ def get_report(
         )
 
     return dict(report)
+
+@router.get("/")
+def get_reports(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    result = db.execute(
+        text("""
+            SELECT
+                r.report_id,
+                r.patient_id,
+                p.patient_ref_id,
+                p.full_name AS patient_name,
+                c.case_id,
+                r.original_filename,
+                r.stored_filename,
+                r.content_type,
+                r.file_size,
+                r.sha256_hash,
+                r.extraction_status,
+                r.extraction_error,
+                r.uploaded_by,
+                r.uploaded_at
+            FROM reports r
+            INNER JOIN patients p
+                ON p.patient_id = r.patient_id
+            LEFT JOIN cases c
+                ON c.report_id = r.report_id
+            ORDER BY
+                r.uploaded_at DESC,
+                r.report_id DESC
+        """)
+    )
+
+    return [
+        dict(row)
+        for row in result.mappings().all()
+    ]
+

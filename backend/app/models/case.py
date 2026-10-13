@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    CheckConstraint,
     String,
     Text,
     Boolean,
@@ -11,6 +12,16 @@ from app.core.database import Base
 
 class Case(Base):
     __tablename__ = "cases"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ("
+            "'Pending Prediction', 'Predicted', 'Recommended', "
+            "'Pending Human Review', 'Assigned', 'Flagged - No Eligible Team', "
+            "'In Progress', 'Resolved'"
+            ")",
+            name="cases_status_check",
+        ),
+    )
 
     case_id = Column(
         String(10),

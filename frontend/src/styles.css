@@ -697,6 +697,7 @@ a { color: inherit; text-decoration: none; }
 .workflow-current-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 16px; padding-top: 13px; border-top: 1px solid #edf1f5; }
 .workflow-current-status > span { color: #8997a8; font-size: 10px; }
 .workflow-current-status > a { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; color: #3574b6; font-size: 10px; font-weight: 650; }
+.case-status-success { margin: 14px 0 0; }
 .workflow-history-table th, .workflow-history-table td { white-space: nowrap; }
 .assignment-detail-card { max-width: 960px; }
 

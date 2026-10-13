@@ -29,6 +29,10 @@ async function record(path, label, options) {
 export const getReports = () => list("/api/reports/", "reports");
 export const getReport = (reportId) => record(`/api/reports/${encodeURIComponent(reportId)}`, "report");
 export const getCaseRecord = (caseId) => record(casePath(caseId), "case");
+export const updateCaseStatus = (caseId, status) => record(casePath(caseId, "/status"), "case status", {
+  method: "PATCH",
+  body: { status },
+});
 export const getCasePrediction = (caseId) => record(casePath(caseId, "/prediction"), "prediction");
 export const createCasePrediction = (caseId) => record(casePath(caseId, "/prediction"), "prediction", { method: "POST" });
 export const getPrediction = (predictionId) => record(`/api/predictions/${encodeURIComponent(predictionId)}`, "prediction");

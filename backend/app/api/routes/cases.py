@@ -3,20 +3,35 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
+from app.auth.dependencies import require_role
 
 from app.ml.inference.prediction_service import predict_department
 
 import json
 
 from app.schemas.assignment import ApprovalRequest,OverrideRequest
+from app.schemas.case import CaseStatusUpdate
 
 from app.services.recommendation.recommendation_service import generate_recommendations
-from app.services.assignment.assignment_service import approve_assignment,override_assignment
+from app.services.assignment.assignment_service import (
+    CaseNotFoundError,
+    CaseStatusConflictError,
+    approve_assignment,
+    override_assignment,
+    update_case_status,
+)
 
 
 router = APIRouter(
     prefix="/api/cases",
     tags=["Cases"]
+)
+
+case_status_user = require_role(
+    "SUPER_ADMIN",
+    "HOSPITAL_ADMIN",
+    "DEPARTMENT_HEAD",
+    "DOCTOR",
 )
 
 
@@ -417,3 +432,35 @@ def get_case(case_id: str, db: Session = Depends(get_db)):
         )
 
     return case
+
+
+@router.patch("/{case_id}/status")
+def patch_case_status(
+    case_id: str,
+    request: CaseStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(case_status_user),
+):
+    actor = current_user.get("full_name") or current_user.get("email")
+
+    try:
+        result = update_case_status(
+            case_id,
+            request.status,
+            actor,
+            db,
+        )
+        db.commit()
+        return result
+    except CaseNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except CaseStatusConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update case status",
+        ) from exc

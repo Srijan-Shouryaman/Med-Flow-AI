@@ -21,6 +21,7 @@ import PredictionsPage from "./pages/PredictionsPage.jsx";
 import RecommendationsPage from "./pages/RecommendationsPage.jsx";
 import AssignmentsPage from "./pages/AssignmentsPage.jsx";
 import AssignmentDetailPage from "./pages/AssignmentDetailPage.jsx";
+import UpdateCaseStatusPage from "./pages/UpdateCaseStatusPage.jsx";
 import PredictionDetailPage from "./pages/PredictionDetailPage.jsx";
 import DiagnosisPage from "./pages/DiagnosisPage.jsx";
 
@@ -64,8 +65,9 @@ function AppRoutes() {
             <Route path="recommendations" element={<RecommendationsPage />} />
             <Route path="assignments" element={<AssignmentsPage />} />
             <Route path="assignments/:assignmentId" element={<AssignmentDetailPage />} />
+            <Route path="case-status" element={<UpdateCaseStatusPage />} />
             {modulePages.map((module) => (
-              ["/patients", "/reports", "/cases", "/predictions", "/recommendations", "/assignments"].includes(module.href) ? null :
+              ["/patients", "/reports", "/cases", "/predictions", "/recommendations", "/assignments", "/case-status"].includes(module.href) ? null :
               <Route
                 key={module.href}
                 path={module.href.slice(1)}

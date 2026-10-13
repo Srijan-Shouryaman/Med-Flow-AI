@@ -3,6 +3,7 @@ import { ArrowRight, Search, UserRoundPlus } from "lucide-react";
 import { Link } from "react-router";
 import Card from "../components/ui/Card.jsx";
 import FeedbackState from "../components/ui/FeedbackState.jsx";
+import PageHeader from "../components/ui/PageHeader.jsx";
 import { formatDate, loadFailureKind } from "../utils/formatters.js";
 import { getPatients } from "../services/patientApi.js";
 
@@ -38,6 +39,7 @@ export default function PatientsPage() {
 
   return (
     <>
+      <PageHeader title="Patients" />
       <Card className="patient-create-card">
         <span className="patient-create-icon"><UserRoundPlus size={19} aria-hidden="true" /></span>
         <div className="patient-create-copy">

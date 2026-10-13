@@ -16,3 +16,4 @@ class ReportResponse(BaseModel):
     extraction_error: str | None
     uploaded_by: int
     uploaded_at: datetime
+    case_id: str | None = None

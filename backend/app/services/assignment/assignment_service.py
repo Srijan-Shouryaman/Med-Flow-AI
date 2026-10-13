@@ -3,6 +3,15 @@ import json
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+
+class CaseNotFoundError(ValueError):
+    pass
+
+
+class CaseStatusConflictError(ValueError):
+    pass
+
+
 def approve_assignment(case_id, approving_user, db):
     case_result = db.execute(
         text("""
@@ -337,6 +346,7 @@ def update_case_status(
                 status
             FROM cases
             WHERE case_id = :case_id
+            FOR UPDATE
         """),
         {
             "case_id": case_id
@@ -346,7 +356,7 @@ def update_case_status(
     case = case_result.mappings().fetchone()
 
     if case is None:
-        raise ValueError("Case not found")
+        raise CaseNotFoundError("Case not found")
 
     current_status = case["status"]
 
@@ -360,27 +370,53 @@ def update_case_status(
     }
 
     if current_status not in allowed_transitions:
-        raise ValueError(
+        raise CaseStatusConflictError(
             f"Case cannot transition from '{current_status}'"
         )
 
     if new_status not in allowed_transitions[current_status]:
-        raise ValueError(
+        raise CaseStatusConflictError(
             f"Invalid status transition from "
             f"'{current_status}' to '{new_status}'"
         )
 
-    db.execute(
+    if current_status == "Assigned" and new_status == "In Progress":
+        assignment_result = db.execute(
+            text("""
+                SELECT assignment_id
+                FROM assignments
+                WHERE case_id = :case_id
+                  AND final_assigned_team_id IS NOT NULL
+                ORDER BY assignment_id DESC
+                LIMIT 1
+            """),
+            {"case_id": case_id}
+        )
+
+        if assignment_result.mappings().fetchone() is None:
+            raise CaseStatusConflictError(
+                "A finalized team assignment is required before moving "
+                "this case to In Progress"
+            )
+
+    update_result = db.execute(
         text("""
             UPDATE cases
             SET status = :new_status
             WHERE case_id = :case_id
+              AND status = :current_status
         """),
         {
             "case_id": case_id,
-            "new_status": new_status
+            "new_status": new_status,
+            "current_status": current_status,
         }
     )
+
+    if update_result.rowcount != 1:
+        raise CaseStatusConflictError(
+            "Case status changed during this update. Reload the case and try again."
+        )
 
     db.execute(
         text("""
