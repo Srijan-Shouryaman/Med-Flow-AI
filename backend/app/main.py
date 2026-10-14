@@ -11,6 +11,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.patients import router as patients_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes import diagnosis
+from app.api.routes.clinical_nlp import router as clinical_nlp_router
 
 app = FastAPI(
     title="MedRoute AI",
@@ -30,7 +31,7 @@ app.include_router(auth_router)
 app.include_router(patients_router)
 app.include_router(reports_router)
 app.include_router(diagnosis.router)
-
+app.include_router(clinical_nlp_router)
 
 @app.get("/health")
 def health_check():
