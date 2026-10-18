@@ -1,3 +1,4 @@
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -12,6 +13,23 @@ class ClinicalEntity(BaseModel):
     evidence: str
     extraction: str
 
+    # Clinical assertion and provenance
+    assertion: str | None = None
+    fact_id: str | None = None
+    evidence_role: str | None = None
+    evidence_spans: list[dict[str, Any]] = Field(default_factory=list)
+
+    # Patient/person context
+    experiencer: str | None = None
+    relation: str | None = None
+    laterality: str | None = None
+    qualifier: str | None = None
+
+    # Structured value and date provenance
+    unit_source: str | None = None
+    value_missing: bool | None = None
+    date_raw: str | None = None
+
 
 # ============================================================
 # Common clinical entities
@@ -25,7 +43,6 @@ class SymptomEntity(ClinicalEntity):
     onset: str | None = None
     duration: str | None = None
     severity: str | None = None
-    experiencer: str | None = None
 
 
 class DiagnosisEntity(ClinicalEntity):
@@ -104,18 +121,13 @@ class CommonClinicalData(BaseModel):
     allergies: list[AllergyEntity] = Field(default_factory=list)
     procedures: list[ProcedureEntity] = Field(default_factory=list)
     investigations: list[InvestigationEntity] = Field(default_factory=list)
-    clinical_history: list[ClinicalHistoryEntity] = Field(
-        default_factory=list
-    )
+    clinical_history: list[ClinicalHistoryEntity] = Field(default_factory=list)
     vital_signs: list[VitalSignEntity] = Field(default_factory=list)
     other_findings: list[OtherFindingEntity] = Field(default_factory=list)
 
 
 # ============================================================
 # Department-specific clinical details
-#
-# These are structured details, not new department predictions.
-# The existing SVM remains responsible for routing.
 # ============================================================
 
 class CardiovascularPulmonaryDetails(BaseModel):
@@ -210,10 +222,11 @@ class DepartmentClinicalData(BaseModel):
 class ClinicalExtractionMetadata(BaseModel):
     extraction_method: str = "rule_based"
     requires_human_review: bool = True
+    allergy_status: dict[str, Any] | None = None
 
 
 # ============================================================
-# Version 2.0 output contract
+# Versioned extraction model
 # ============================================================
 
 class ClinicalExtractionV2(BaseModel):
@@ -230,10 +243,7 @@ class ClinicalExtractionV2(BaseModel):
 
 
 # ============================================================
-# Backward-compatible legacy extraction model
-#
-# Keep existing extraction_service.py imports working while
-# the service migrates to the versioned output.
+# Legacy extraction model
 # ============================================================
 
 class ClinicalExtraction(CommonClinicalData):
@@ -241,25 +251,21 @@ class ClinicalExtraction(CommonClinicalData):
 
 
 # ============================================================
-# Combined extraction contract for API persistence
-#
-# This matches the agreed JSON structure:
-# {
-#     "common": {...},
-#     "department_specific": {
-#         "cardiovascular_pulmonary": {...},
-#         "consult_history_physical": {...},
-#         "gastroenterology": {...},
-#         "orthopedic": {...},
-#         "radiology": {...}
-#     }
-# }
+# Combined extraction contract used by the existing API
+# patient_id is persisted inside extraction_json
 # ============================================================
 
 class CombinedClinicalExtraction(BaseModel):
+    patient_id: int = Field(
+        ...,
+        gt=0,
+        description="ID of the patient associated with this extraction",
+    )
+
     common: CommonClinicalData = Field(
         default_factory=CommonClinicalData
     )
+
     department_specific: dict[str, dict[str, Any]] = Field(
         default_factory=dict
     )
