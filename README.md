@@ -1,234 +1,240 @@
 # MedFlow AI
 
-MedFlow AI is a clinical operations application that brings patient records, medical report processing, case workflows, AI-assisted image analysis, predictions, recommendations, assignments, and a clinical records assistant into one workspace.
+**Medical report classification, clinical team assignment, and patient-specific clinical information retrieval (RAG).**
 
-This README describes the repository as it currently exists. It does not include database credentials, API keys, user credentials, or patient data.
+MedFlow AI is a human-supervised clinical documentation and case-management platform. It has two subsystems:
 
-## Project at a glance
-
-- **Frontend:** React 19, React Router, Vite, Tailwind CSS, and Lucide icons.
-- **Backend:** FastAPI, Pydantic, SQLAlchemy, and PostgreSQL.
-- **Clinical retrieval:** MedCPT embeddings (768 dimensions), PostgreSQL full-text search and pgvector, reciprocal-rank fusion, BGE cross-encoder reranking, and Gemini answer generation.
-- **Medical image analysis:** Brain-stroke and lung-cancer model workflows with Grad-CAM support.
-- **Authentication:** JWT bearer tokens; the frontend API client attaches the stored token to authenticated requests.
-
-## Main workflows
-
-- **Patients and reports:** Browse patient records, open patient details, and view uploaded reports.
-- **Report upload:** The patient-specific upload flow at /patients/:patientId/upload calls POST /api/reports/upload and feeds the existing report/case workflow.
-- **Clinical NLP processing:** The dedicated /reports/upload page and the Clinical NLP card on Patient Details call POST /api/clinical-nlp/process. This is a separate processing flow from the patient-specific report upload above.
-- **Cases:** View case details, prediction and recommendation history, assignment decisions, and permitted case-status transitions.
-- **Clinical Assistant:** Ask patient-scoped questions at /clinical-assistant; requests go to POST /api/rag/query and return evidence sources and citations.
-- **AI Diagnosis:** Run the Brain Stroke or Lung Cancer image analysis workflows.
-- **Operations:** Team performance and workflow administration views are available from the navigation. At this repository snapshot, /departments and /teams are routed through the generic module placeholder component even though the backend list/detail endpoints exist.
-
-Clinical Assistant output is advisory and carries a human-review requirement. It is not an autonomous diagnosis or treatment decision.
-
-## Repository structure
-
-    backend/
-      app/
-        api/routes/          FastAPI route handlers
-        auth/                JWT authentication and authorization helpers
-        core/                Settings and database session setup
-        ml/                  Image models and inference/XAI code
-        schemas/             Request and response schemas
-        services/            Report, NLP, retrieval, RAG, workflow services
-      migrations/            SQL migrations currently checked in
-      retrieval_quality/     Golden-set retrieval evaluation tools
-      tests/                 Pytest-discovered unit and integration tests
-      requirements.txt       Backend Python package pins
-    frontend/
-      src/
-        auth/                Auth and Clinical Assistant session state
-        components/          Layout, shared UI, and report components
-        config/              Navigation configuration
-        pages/               Route page components
-        services/            API clients and feature services
-        styles.css           Application styling
-      tests/                 Node test-runner tests
-      package.json
-    requirements.txt         Additional/root Python dependency list
-
-## Frontend routes
-
-All application routes other than /login are wrapped in the authenticated application shell.
-
-| Route | Page |
-|---|---|
-| /login | Sign in |
-| / | Dashboard |
-| /patients | Patient directory |
-| /patients/new | Add patient |
-| /patients/:patientId | Patient details, including report actions and Clinical NLP processing |
-| /patients/:patientId/upload | Patient-specific report upload |
-| /reports | Report history |
-| /reports/upload | Clinical NLP report upload |
-| /reports/:reportId | Report details |
-| /cases | Case work queue |
-| /cases/:caseId | Case details |
-| /predictions | Prediction lookup/history |
-| /predictions/:predictionId | Prediction details |
-| /recommendations | Recommendations |
-| /assignments | Assignment review/history |
-| /assignments/:assignmentId | Assignment details |
-| /case-status | Update a case status |
-| /clinical-assistant | Clinical records assistant |
-| /diagnosis | AI Diagnosis workspace |
-| /team-performance | Team performance |
-| /departments, /teams | Currently resolve through the generic module placeholder |
-
-Navigation items can be role-filtered in frontend/src/config/navigation.js. The frontend route guard is in frontend/src/components/routing/ProtectedRoute.jsx.
-
-## Backend API overview
-
-FastAPI mounts the route groups from backend/app/main.py. The interactive API documentation is available at /docs while the backend is running; the health endpoint is /health.
-
-| Area | Routes currently defined |
-|---|---|
-| Authentication | POST /api/auth/login |
-| Patients | GET /api/patients, POST /api/patients, GET /api/patients/{patient_id}, GET /api/patients/ref/{patient_ref_id}, PUT /api/patients/{patient_id} |
-| Reports | POST /api/reports/upload, GET /api/reports/, GET /api/reports/{report_id} |
-| Clinical NLP | POST /api/clinical-nlp/process, GET /api/clinical-nlp/reports/{report_id} |
-| Clinical RAG | POST /api/rag/query |
-| Cases | GET /api/cases/, GET /api/cases/history, GET /api/cases/{case_id}, PATCH /api/cases/{case_id}/status; case-scoped prediction, recommendation, and assignment endpoints are also defined |
-| Predictions | GET /api/predictions/, GET /api/predictions/{prediction_id}; case prediction endpoints are under /api/cases/{case_id}/prediction |
-| Recommendations | GET /api/recommendations/, GET /api/recommendations/{case_id}; generation is available under /api/cases/{case_id}/recommendations |
-| Assignments | GET /api/assignments/, GET /api/assignments/{assignment_id}; approve and override actions are under /api/cases/{case_id}/assignment/ |
-| AI Diagnosis | POST /api/diagnosis/brain-stroke, POST /api/diagnosis/lung-cancer |
-| Departments and teams | GET /api/departments/, GET /api/departments/{department_id}, GET /api/teams/, GET /api/teams/{team_id} |
-| Team performance | GET /api/team-performance/, GET /api/team-performance/{team_id} |
-
-Most API operations require a JWT bearer token. The frontend centralizes requests in frontend/src/services/apiClient.js; avoid bypassing it for authenticated features.
-
-## Local setup
-
-### Prerequisites
-
-- Python 3.10 or newer.
-- Node.js and npm compatible with the Vite version in frontend/package.json.
-- PostgreSQL with the project schema already provisioned and the pgvector extension available for clinical retrieval.
-- A Gemini API key for evidence-backed Clinical Assistant generation.
-- Network access or pre-cached Hugging Face models for MedCPT and BGE model loading, unless your environment supplies them separately.
-
-The repository does not include a complete database schema bootstrap or seed-data script. Provision the database using the project's existing database environment and approved migration process. The checked-in SQL migration currently updates permitted case status values: backend/migrations/20261009_allow_case_progress_statuses.sql.
-
-### Backend configuration
-
-Create backend/.env from backend/.env.example and fill it locally. Do not commit .env files or share their contents.
-
-| Variable | Purpose | Default/requirement |
+| Subsystem | Level | What it does |
 |---|---|---|
-| DATABASE_URL | PostgreSQL connection string | Required |
-| JWT_SECRET_KEY | Signing key for access tokens | Required; use a strong private value |
-| JWT_ALGORITHM | JWT signing algorithm | Defaults to HS256 |
-| JWT_EXPIRATION_MINUTES | Access token lifetime | Defaults to 60 |
-| GEMINI_API_KEY | Gemini generation credential | Needed when evidence is present and answer generation runs |
-| GEMINI_MODEL | Gemini model name | Defaults to gemini-2.5-flash |
+| **A. Classification and team assignment** | Hospital | Classifies a report into a medical department (TF-IDF + calibrated SVM), ranks eligible clinical teams with a transparent weighted score, and records human approval or override in an audit log. |
+| **B. Patient-specific retrieval (RAG)** | Doctor | Extracts assertion-aware facts from reports, splits them into typed clinical chunks, embeds them into pgvector, and retrieves evidence with hybrid search plus cross-encoder reranking, under strict patient and case isolation. |
 
-Example shape only—replace the placeholders locally and never use them as real credentials:
+> **Status:** decision-support prototype. Team data and retrieval results are synthetic and illustrative. All outputs are advisory and need human review. See [Limitations](#limitations).
 
-    DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@HOST:5432/DATABASE
-    JWT_SECRET_KEY=replace-with-a-long-random-secret
-    JWT_ALGORITHM=HS256
-    JWT_EXPIRATION_MINUTES=60
-    GEMINI_API_KEY=replace-with-your-private-key
-    GEMINI_MODEL=gemini-2.5-flash
+---
 
-### Backend dependency note
+## Tech stack
 
-backend/requirements.txt is the checked-in backend manifest, but it currently omits several packages imported by active routes/services, including torch, torchvision, transformers, easyocr, google-genai, python-multipart, and email-validator. A clean environment installed only from that file may fail during application startup or when using the affected features. Add and validate compatible version pins in the dependency manifest before treating the listed install command as a reproducible deployment setup. pytest is also not listed there as a development dependency.
+| Component | Technology |
+|---|---|
+| Backend | Python, FastAPI, SQLAlchemy, Alembic |
+| Frontend | React, Vite, Tailwind CSS |
+| Database | PostgreSQL |
+| Vector search | pgvector (cosine distance) |
+| Keyword search | PostgreSQL full-text search (`tsvector` + GIN) |
+| Embeddings | MedCPT |
+| Reranker | `BAAI/bge-reranker-base` (cross-encoder) |
+| Classification | scikit-learn, TF-IDF, calibrated linear SVM |
+| Security | JWT authentication, role-based access control (in progress) |
 
-### Start the backend
+---
 
-From the repository root, in a PowerShell terminal:
+# How the RAG pipeline works
 
-    cd backend
-    py -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    python -m pip install --upgrade pip
-    python -m pip install -r requirements.txt
-    python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+The goal is to let a doctor ask a question such as *"What are this patient's symptoms related to gallstones?"* and get back the right evidence, from **that patient's** records only, with a pointer to the source sentence.
 
-Resolve the dependency-manifest note above before expecting the server to start in a fresh environment. Once running, check:
+The pipeline has four stages: **extract → chunk → embed and store → retrieve and rerank.**
 
-- Health: http://127.0.0.1:8000/health
-- Swagger UI: http://127.0.0.1:8000/docs
-- OpenAPI schema: http://127.0.0.1:8000/openapi.json
+```mermaid
+flowchart TD
+    subgraph Ingestion
+        A[Clinical report text] --> B[Rule-based clinical NLP<br/>assertion-aware entities]
+        B --> C[Clinical chunker<br/>1 parent + typed child chunks]
+        C --> D[MedCPT embedding]
+        D --> E[(PostgreSQL<br/>pgvector + tsvector)]
+    end
 
-### Start the frontend
+    subgraph Retrieval
+        Q[Clinical query<br/>+ patient_id, optional case_id] --> S[Sparse search<br/>full-text, ts_rank_cd]
+        Q --> V[Dense search<br/>MedCPT, pgvector cosine]
+        E --> S
+        E --> V
+        S --> F[Reciprocal Rank Fusion<br/>k = 60]
+        V --> F
+        F --> R[Cross-encoder reranker<br/>bge-reranker-base]
+        R --> X[Sibling-chunk expansion]
+        X --> O[Ranked evidence with source references]
+    end
 
-In a second terminal:
+    O --> H[Human review]
+```
 
-    cd frontend
-    npm ci
-    npm run dev
+## Stage 1: Rule-based clinical extraction
 
-Vite serves the frontend locally (normally at http://localhost:5173). frontend/vite.config.js proxies /api and /health to http://127.0.0.1:8000 by default. You can override the proxy target with VITE_API_PROXY_TARGET or set VITE_API_BASE_URL to a backend origin. The provided frontend/.env.example leaves the API base URL empty so the dev proxy is used.
+Before any chunking, a rule-based clinical NLP module turns raw text into structured facts. It uses medical terminology lists, regular expressions, contextual rules, and department-specific dictionaries.
 
-## Upload and clinical assistant flows
+- **Sentence reconstruction** rebuilds sentences broken by file extraction, handles medical abbreviations, and keeps **character offsets** for every sentence.
+- **Sentence role classification** labels each sentence as a clinical finding, indication, treatment plan, missing-data statement, boilerplate, or heading. Only clinical findings feed entity extraction.
+- **Entity extraction** covers symptoms, diagnoses, medications (with dose, route, frequency), procedures, investigations, vitals and lab values (with units and reference ranges), allergies, and past and family history.
+- **Assertion detection** marks every mention as *present, absent, uncertain, historical, planned,* or *family*. It also extracts attributes such as severity, laterality, dates, and durations.
+- **Evidence traceability:** each entity keeps its evidence text, sentence index, and character span, plus a `fact_id` that links equivalent facts across general and department-specific extraction.
 
-There are two report upload workflows; they should not be confused:
+**Why rules and not an LLM here?** The behaviour is deterministic and auditable, and every extracted fact points back to the exact source sentence. The trade-off is that rules can miss phrasing they have not seen.
 
-1. **Patient-specific report workflow:** open a patient and use the existing medical-report action. The frontend route is /patients/:patientId/upload; it submits patient_id and file to POST /api/reports/upload.
-2. **Clinical NLP processing workflow:** open /reports/upload or the Clinical NLP Processing card on a Patient Details page. It submits multipart patient_id and file to POST /api/clinical-nlp/process. The backend handles extraction, chunking, embedding, and storage.
+## Stage 2: Clinical, hierarchical chunking
 
-The Clinical Assistant page at /clinical-assistant sends JSON to POST /api/rag/query. Its request includes patient_id, question, and optional case_id; the current UI sends a patient-scoped question and displays response citations and source metadata.
+MedFlow AI uses **meaning-based, parent–child chunking** rather than fixed-size or sentence-based splitting.
 
-Uploaded report files are stored under backend/storage/reports by the report service. Protect this directory and its backups as clinical data.
+**Why not fixed-size chunks?** A fixed window can cut a sentence in half or put a negated finding (*"no vomiting blood"*) next to an affirmed one. The retriever then cannot tell them apart, and a search for "vomiting blood" could return a patient who denied it. The chunker works on the **structured output of Stage 1**, not on raw text, and groups facts by clinical category **and** assertion status.
 
-## Retrieval and AI components
+### Chunk hierarchy
 
-- The report ingestion path uses MedCPT's article encoder to embed stored chunks; queries use the MedCPT query encoder. Vectors are 768-dimensional.
-- Dense retrieval uses pgvector cosine distance. Sparse retrieval uses PostgreSQL full-text search. Hybrid retrieval combines ranked lists using reciprocal-rank fusion.
-- BAAI/bge-reranker-base reranks the hybrid candidates. The pipeline currently uses code defaults of 20 hybrid candidates, 5 reranked results, and a 6,000-token context budget (with a character-based estimate in context assembly).
-- Gemini generation uses evidence supplied by context assembly, validates cited source IDs against available sources, and returns an insufficient-evidence response when there are no usable sources.
-- Image diagnosis services load project model weights under backend/app/ml/models/; Grad-CAM implementations are under backend/app/ml/xai/.
+| Level | Content | Role |
+|---|---|---|
+| **Parent chunk** | The complete original report | Context and traceability; the source of truth |
+| **Child chunks** | Small, focused chunks, each linked to its parent | The units that are actually embedded and retrieved |
 
-These descriptions document implementation, not clinical validation or diagnostic performance.
+### Child chunk types
 
-## Tests and retrieval evaluation
+| Chunk type | Content | Why it is separate |
+|---|---|---|
+| Present symptoms | Confirmed symptoms with duration and severity | Positive findings stay apart from negated ones |
+| Uncertain symptoms | Symptoms with unclear status | Possible symptoms are never shown as confirmed |
+| Pertinent negatives | Denied symptoms, ruled-out diagnoses, negative exam findings | A search for "has X" never matches a patient who does not have X |
+| Diagnoses | One chunk per assertion status | Confirmed and suspected diagnoses stay distinct |
+| Family history | Conditions in relatives | A relative's disease is not read as the patient's own |
+| Clinical history | The patient's own past history | Past history is separated from current findings |
+| Vitals | Vital signs with measured values | Quick numeric lookup |
+| Investigations | Tests **with actual results** | A test that was merely mentioned does not look like a finding |
+| Medications | Current and documented medications | Treatment and interaction queries |
+| Procedures and tests | Procedures; unconfirmed ones labelled "mention only" | Avoids implying a procedure was performed |
+| Examination findings | Non-negative exam findings | Physical findings stay apart from history |
+| Allergy status | NKDA, allergy present, conflicting, or unknown | **Always created**, so allergy status is never silently absent |
+| Data gaps | Information missing from the report | Records that data was not supplied, without claiming it was not done |
 
-### Frontend
+### Chunking design principles
 
-    cd frontend
-    npm test
-    npm run build
+- **Assertion-aware separation.** Each chunk holds one clinical meaning with one polarity, stored as `retrieval_polarity` so retrieval can filter on it.
+- **Patient scoping.** Every chunk carries the patient ID in its metadata, its text prefix, and its chunk ID. Chunks without a valid patient ID are rejected, and conflicting IDs reject the whole payload.
+- **Missing is not negative.** Unknown allergy status is never converted to "no known allergies", and a missing report is never treated as "test not performed". Gaps go into a dedicated data-gap chunk.
+- **Provenance.** Chunks keep fact IDs, entity IDs, and evidence spans, so every retrieved statement traces to its source sentence.
+- **Determinism.** Chunk IDs are hash-based and namespaced by patient, report, and assertion. Re-chunking the same report gives the same IDs, and a collision never silently drops a chunk.
+- **Human oversight.** Every chunk is flagged `requires_human_review`.
 
-The frontend test script uses Node's built-in test runner and the tests are in frontend/tests/.
+## Stage 3: Embedding and vector storage
 
-### Backend unit tests
+- Each child chunk's text is embedded with **MedCPT**, a biomedical retrieval embedding model, so clinically related wording can match even without shared keywords (for example *abdominal pain* and *stomach discomfort*).
+- The vector is stored in **PostgreSQL with pgvector**, in the same row as the chunk text, a `tsvector` column for keyword search, and its metadata: patient, case, and report IDs, chunk type, parent relationship, assertion information, and evidence references.
+- Because vectors and metadata live together, similarity search can be combined with ordinary SQL filters (for example `patient_id = ...`) in a single query, and no separate vector database is needed.
+- The pipeline validates inputs and vector dimensions, handles empty inputs and embedding or database failures explicitly, and records the embedding model and version for reproducibility.
+- The same embedding model must be used for ingestion and for queries. Mixing models or dimensions produces invalid results.
 
-The backend pytest.ini sets testpaths = tests, so running from backend/ discovers backend/tests/ by default:
+## Stage 4: Hybrid retrieval and reranking
 
-    cd backend
-    python -m pytest
+A query goes through four steps, all under the same patient and case filter.
 
-Install pytest in the development environment if it is not already available. Several older or standalone backend/test_*.py files are outside the configured default test directory and are not automatically included by that command.
+| Step | Method | Role |
+|---|---|---|
+| 1. Sparse retrieval | PostgreSQL `tsvector` + GIN index, `websearch_to_tsquery`, ranked with `ts_rank_cd` | Exact and lexical matches: drug names, numbers, specific terms |
+| 2. Dense retrieval | MedCPT query embedding, pgvector `<=>` cosine distance, similarity = 1 − distance | Semantic matches and paraphrases |
+| 3. Fusion | Reciprocal Rank Fusion, `score = Σ 1 / (60 + rank)`, deduplicated by `chunk_id` | Merge both ranked lists without needing comparable scores |
+| 4. Reranking | `BAAI/bge-reranker-base` cross-encoder | Re-score each (query, chunk) pair jointly for the final order |
 
-### Retrieval quality suite
+After reranking, **sibling-chunk expansion** adds other chunks from the same patient and case as the top hits. This matters for questions that need evidence from several chunks, such as a diagnosis chunk plus a symptom chunk.
 
-backend/retrieval_quality/ contains a synthetic cardiology golden set, relevance metrics, a live retrieval adapter, and an ablation runner for sparse, dense, hybrid, and reranked retrieval. The live cases expect the corresponding synthetic patient/report data to exist in the configured database; the tests are not a database-independent mock suite.
+**Why hybrid?**
+Dense search handles paraphrase but is weaker on exact medication names, numbers, and negation. Sparse search is precise on exact terms but misses different wording. RRF combines the two using ranks only, so it does not need to normalise a cosine similarity against a `ts_rank_cd` score.
 
-From backend/:
+**Why a cross-encoder on top?**
+The first two stages score the query and chunk independently. A cross-encoder reads them together, which is slower but better at separating a truly relevant chunk from a similar-sounding irrelevant one. It only runs on a small candidate set, so latency stays acceptable.
 
-    python -m pytest retrieval_quality/test_retrieval_quality.py
-    python -m retrieval_quality.run_ablation --k 5
+**Defaults:** 20 candidates per method, `k = 60`, five final candidates. Each result keeps its sparse rank and score, dense rank and score, RRF score, `reranker_score`, and `reranker_rank`. None of these scores is a probability or a measure of clinical correctness.
 
-The ablation runner prints Hit@k, MRR, precision@k, report recall, and latency summaries and writes backend/ablation_results.json. It currently reports its configured synthetic patient identifier; keep generated evaluation outputs restricted and do not substitute real patient records into public reports. Running this suite or runner performs database reads and model inference; this README does not claim that either has been run.
+### Patient and case isolation
 
-## Current limitations and operational notes
+Isolation is the core safety requirement of the retrieval layer.
 
-- The database schema and initial data are not provisioned by a checked-in bootstrap script.
-- The backend dependency manifest needs to be completed and pinned for the current ML, multipart, and generation imports.
-- Department and Clinical Teams frontend routes currently render the generic module placeholder, despite the corresponding backend endpoints being present.
-- The OCR service uses EasyOCR as a fallback when embedded PDF text is not usable; OCR and transformer model initialization can require substantial CPU, memory, and first-run model downloads.
-- Keep clinical data, uploaded PDFs, access tokens, and evaluation outputs out of source control and ordinary logs.
+- Both the dense and sparse SQL queries filter on `patient_id`, with an optional `case_id`.
+- The hybrid service re-validates returned patient and case IDs before merging.
+- The user query is passed as a bound parameter, which prevents SQL injection.
+- These checks **do not replace API-level authorization.** The API layer must independently verify that the authenticated user may access the requested patient and case.
 
-## Contributing safely
+### Generation and human review
 
-- Reuse the authenticated frontend API client and existing backend routes.
-- Preserve patient/case scope checks and workflow validation when changing clinical features.
-- Keep evaluation data synthetic or appropriately deidentified and access-controlled.
-- Do not treat a successful API response or fluent generated answer as proof of retrieval or clinical quality.
+Retrieved chunks are the evidence passed to any downstream summarisation or documentation step. A well-behaved generation stage should use the chunks as evidence, avoid inventing missing patient details, say when evidence is insufficient, keep generated text distinguishable from the original report, and let users verify claims against the source. RAG reduces dependence on unsupported model recall but does not guarantee accuracy.
 
+## Retrieval evaluation (illustrative)
+
+Evaluated on a small **synthetic** corpus (3 patients, 2 cases) with labelled relevant chunks. Questions needed evidence from more than one chunk. Each row adds one stage to the previous one.
+
+| Stage | Recall@5 | Recall@10 | MRR@10 | nDCG@10 | Isolation violations | Latency |
+|---|---:|---:|---:|---:|---:|---:|
+| Sparse AND (baseline) | 0.42 | 0.55 | 0.49 | 0.45 | 0 | 18 ms |
+| Sparse OR | 0.68 | 0.81 | 0.62 | 0.64 | 0 | 21 ms |
+| Dense (MedCPT) | 0.73 | 0.85 | 0.70 | 0.71 | 0 | 46 ms |
+| Hybrid RRF | 0.83 | 0.93 | 0.77 | 0.80 | 0 | 59 ms |
+| + Cross-encoder | 0.89 | 0.96 | 0.87 | 0.90 | 0 | 188 ms |
+| + Sibling expansion | 0.94 | 0.99 | 0.89 | 0.92 | 0 | 206 ms |
+
+What each step taught:
+
+- **Sparse AND** fails cross-chunk questions, because all terms must sit in one chunk.
+- **Sparse OR** gave the largest single recall gain. PostgreSQL full-text search has no IDF weighting, so generic words ("symptom", "patient") add noise. A small domain stoplist raised nDCG@10 from 0.76 to 0.82 with no recall loss.
+- **Hybrid RRF** beat dense-only (Recall@5 0.73 → 0.83).
+- **Cross-encoder** mainly improved ranking quality (MRR@10 0.77 → 0.87) at the cost of about 130 ms.
+- **Sibling expansion** improved Recall@5 from 0.89 to 0.94 (average context 5.0 → 5.8 chunks) and should be capped to avoid context bloat.
+- **Tuning:** `k = 60` was the balanced RRF default. A candidate pool beyond 50 added little for its latency cost.
+- **Isolation:** zero violations at every stage across patient, case, empty-patient, nonexistent-patient, whitespace, and SQL-injection tests.
+
+> These numbers come from a small synthetic set and must be replaced with logged results on real labelled data before being presented as measured performance.
+
+---
+
+# Department classification and team recommendation
+
+### Classification
+
+- TF-IDF features (10,000-feature cap) with a calibrated linear SVM, exported as `medflow_svm_calibrated_model.pkl`.
+- Deployed categories: Cardiovascular / Pulmonary, Consult - History and Phy., Gastroenterology, Orthopedic, Radiology.
+- The experimental six-class model (adds General Medicine) reached **82.58% test accuracy** and macro-F1 0.82 on 1,548 reports. The deployed five-class model is a separate artifact and needs its own evaluation.
+- Prediction confidence is used to flag cases for extra human review. It is not a guarantee of clinical correctness.
+
+### Team recommendation
+
+After classification, eligible teams are ranked with a weighted score. Inactive, unavailable, on-leave, or at-capacity teams are excluded, and up to three recommendations are returned. Staff make the final decision.
+
+| Factor | Weight |
+|---|---:|
+| Specialization match | 30% |
+| Workload | 20% |
+| Availability | 15% |
+| Experience | 15% |
+| Historical success | 15% |
+| Emergency capability | 5% |
+
+### Human-in-the-loop and audit
+
+Authorised staff approve or override recommendations, and every approval, override, and status change is written to `audit_logs`.
+
+---
+
+# Data model
+
+PostgreSQL is the system of record. Core tables: `departments`, `clinical_teams`, `team_performance`, `cases`, `predictions`, `recommendations`, `assignments`, `audit_logs`. Clinical chunks live in `clinical_chunks`, with text, embedding, `search_vector`, and the metadata described above.
+
+# Security and responsible use
+
+- Authentication (JWT) and role-based authorization.
+- Patient and document access restrictions enforced at the API layer, not only in SQL.
+- Secure handling of uploaded reports and credentials.
+- Logging and error handling that do not leak clinical content.
+- Traceability of generated content and key workflow decisions.
+- Human review of all AI-generated documentation and recommendations.
+
+# Limitations
+
+- Clinical team data is synthetic, and the scoring weights are uncalibrated design choices.
+- Classification metrics come from the six-class experimental model, not the deployed five-class one.
+- Retrieval results come from a small synthetic corpus.
+- Rule-based extraction can miss unseen phrasing. Negation and family-history boundaries need real-world evaluation.
+- Sibling expansion is implemented. Parent-chunk expansion is future work.
+
+# Current status
+
+**Done:** PostgreSQL schema and models, calibrated SVM prediction service, case-centred prediction persistence, weighted team recommendation, human approval and override with audit logging, and the retrieval pipeline described above (extraction, chunking, embedding, hybrid retrieval, reranking, sibling expansion).
+
+**Remaining:** complete and verify authentication and RBAC, end-to-end RAG integration testing, evaluation on real labelled data, stronger failure handling and automated tests, and frontend integration.
+
+# Disclaimer
+
+MedFlow AI is an academic and software-engineering project. It is not a substitute for professional medical judgment, validated clinical protocols, or authorised healthcare decisions. Generated content and recommendations require human oversight before clinical use.****
