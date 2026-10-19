@@ -1775,6 +1775,19 @@ def chunk_extraction(
 
 def chunk_clinical_extraction(
     payload: dict[str, Any],
+    full_text: str | None = None,
 ) -> list[ClinicalChunk]:
-    """Compatibility wrapper for callers expecting a list."""
-    return chunk_extraction(payload).children
+    """Compatibility wrapper for callers expecting a list.
+
+    Args:
+        payload: Clinical extraction payload.
+        full_text: Optional original clinical report text. When provided,
+            it is forwarded to chunk_extraction for the parent report chunk.
+
+    Returns:
+        The list of clinical child chunks.
+    """
+    return chunk_extraction(
+        payload,
+        full_text=full_text,
+    ).children
