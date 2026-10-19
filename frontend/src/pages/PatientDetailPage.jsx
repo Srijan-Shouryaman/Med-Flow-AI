@@ -4,6 +4,7 @@ import { Link, useLocation, useParams } from "react-router";
 import Card from "../components/ui/Card.jsx";
 import FeedbackState from "../components/ui/FeedbackState.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import ClinicalNlpUploadCard from "../components/reports/ClinicalNlpUploadCard.jsx";
 import ReportUploadPage from "./ReportUploadPage.jsx";
 import { getPatient } from "../services/patientApi.js";
 import { formatDate, loadFailureKind } from "../utils/formatters.js";
@@ -107,24 +108,27 @@ export default function PatientDetailPage() {
           </div>
         </Card>
 
-        {isUploadOpen ? (
-          <ReportUploadPage key={patient.patient_id} patientRecord={patient} inline onCancel={() => setIsUploadOpen(false)} />
-        ) : (
-          <Card className="patient-detail-card patient-report-prompt-card">
-            <div className="patient-detail-heading">
-              <span className="patient-profile-icon"><FileUp size={19} aria-hidden="true" /></span>
-              <div>
-                <p className="card-eyebrow">Medical report</p>
-                <h2>Upload a medical report</h2>
+        <div className="patient-report-column">
+          {isUploadOpen ? (
+            <ReportUploadPage key={patient.patient_id} patientRecord={patient} inline onCancel={() => setIsUploadOpen(false)} />
+          ) : (
+            <Card className="patient-detail-card patient-report-prompt-card">
+              <div className="patient-detail-heading">
+                <span className="patient-profile-icon"><FileUp size={19} aria-hidden="true" /></span>
+                <div>
+                  <p className="card-eyebrow">Medical report</p>
+                  <h2>Upload a medical report</h2>
+                </div>
               </div>
-            </div>
-            <p className="patient-report-copy">Attach a PDF report to this patient. The report will be processed and, when text extraction succeeds, added to the case workflow.</p>
-            <button className="patient-primary-button patient-action-button" type="button" onClick={() => setIsUploadOpen(true)}>
-              <FileUp size={16} aria-hidden="true" /> Upload medical report
-            </button>
-            <Link className="patient-case-link" to="/cases"><ClipboardList size={15} aria-hidden="true" /> Open case workflow</Link>
-          </Card>
-        )}
+              <p className="patient-report-copy">Attach a PDF report to this patient. The report will be processed and, when text extraction succeeds, added to the case workflow.</p>
+              <button className="patient-primary-button patient-action-button" type="button" onClick={() => setIsUploadOpen(true)}>
+                <FileUp size={16} aria-hidden="true" /> Upload medical report
+              </button>
+              <Link className="patient-case-link" to="/cases"><ClipboardList size={15} aria-hidden="true" /> Open case workflow</Link>
+            </Card>
+          )}
+          <ClinicalNlpUploadCard key={String(patient.patient_id)} patientId={patient.patient_id} />
+        </div>
       </div>
     </>
   );

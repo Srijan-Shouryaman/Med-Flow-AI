@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import AppShell from "./components/layout/AppShell.jsx";
 import ProtectedRoute from "./components/routing/ProtectedRoute.jsx";
 import { navigationSections } from "./config/navigation.js";
+import { ClinicalAssistantSessionProvider } from "./auth/ClinicalAssistantSessionContext.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import ModulePlaceholderPage from "./pages/ModulePlaceholderPage.jsx";
@@ -13,6 +14,7 @@ import PatientsPage from "./pages/PatientsPage.jsx";
 import PatientDetailPage from "./pages/PatientDetailPage.jsx";
 import PatientFormPage from "./pages/PatientFormPage.jsx";
 import ReportUploadPage from "./pages/ReportUploadPage.jsx";
+import ClinicalReportUploadPage from "./pages/ClinicalReportUploadPage.jsx";
 import CasesPage from "./pages/CasesPage.jsx";
 import CaseDetailPage from "./pages/CaseDetailPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
@@ -24,6 +26,7 @@ import AssignmentDetailPage from "./pages/AssignmentDetailPage.jsx";
 import UpdateCaseStatusPage from "./pages/UpdateCaseStatusPage.jsx";
 import PredictionDetailPage from "./pages/PredictionDetailPage.jsx";
 import DiagnosisPage from "./pages/DiagnosisPage.jsx";
+import ClinicalAssistantPage from "./pages/ClinicalAssistantPage.jsx";
 
 const modulePages = navigationSections.flatMap((section) =>
   section.items
@@ -41,7 +44,9 @@ function AuthenticatedAppShell() {
   }
 
   return (
-    <AppShell user={user} onLogout={handleLogout} />
+    <ClinicalAssistantSessionProvider key={user?.user_id ?? "authenticated-session"}>
+      <AppShell user={user} onLogout={handleLogout} />
+    </ClinicalAssistantSessionProvider>
   );
 }
 
@@ -56,6 +61,7 @@ function AppRoutes() {
             <Route path="patients/new" element={<PatientFormPage />} />
             <Route path="patients/:patientId/upload" element={<ReportUploadPage />} />
             <Route path="patients/:patientId" element={<PatientDetailPage />} />
+            <Route path="reports/upload" element={<ClinicalReportUploadPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/:reportId" element={<ReportDetailPage />} />
             <Route path="cases" element={<CasesPage />} />
@@ -66,8 +72,9 @@ function AppRoutes() {
             <Route path="assignments" element={<AssignmentsPage />} />
             <Route path="assignments/:assignmentId" element={<AssignmentDetailPage />} />
             <Route path="case-status" element={<UpdateCaseStatusPage />} />
+            <Route path="clinical-assistant" element={<ClinicalAssistantPage />} />
             {modulePages.map((module) => (
-              ["/patients", "/reports", "/cases", "/predictions", "/recommendations", "/assignments", "/case-status"].includes(module.href) ? null :
+              ["/patients", "/reports", "/cases", "/predictions", "/recommendations", "/assignments", "/case-status", "/clinical-assistant"].includes(module.href) ? null :
               <Route
                 key={module.href}
                 path={module.href.slice(1)}

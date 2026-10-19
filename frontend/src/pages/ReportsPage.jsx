@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, FileText, Search } from "lucide-react";
+import { ArrowRight, FileText, FileUp, Search } from "lucide-react";
 import { Link } from "react-router";
 import Card from "../components/ui/Card.jsx";
 import FeedbackState from "../components/ui/FeedbackState.jsx";
@@ -44,6 +44,9 @@ export default function ReportsPage() {
             <h2>Uploaded reports</h2>
           </div>
           <div className="workflow-list-controls">
+            <Link className="patient-primary-button report-upload-link" to="/reports/upload">
+              <FileUp size={15} aria-hidden="true" /> Upload report
+            </Link>
             <label className="patient-search">
               <Search size={16} aria-hidden="true" />
               <span className="sr-only">Search reports</span>

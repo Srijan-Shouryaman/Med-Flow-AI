@@ -5,6 +5,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  MessageCircle,
   RefreshCw,
   Stethoscope,
   Users,
@@ -51,6 +52,14 @@ export const navigationSections = [
         icon: Brain,
         description: "Standalone image-based AI diagnosis tools.",
         ai: true,
+      },
+      {
+        label: "Clinical Assistant",
+        href: "/clinical-assistant",
+        icon: MessageCircle,
+        description: "Ask evidence-grounded questions about a patient's clinical records.",
+        ai: true,
+        roles: ["DOCTOR", "DEPARTMENT_HEAD", "HOSPITAL_ADMIN", "SUPER_ADMIN"],
       },
       {
         label: "Predictions",

@@ -133,7 +133,7 @@ export default function AppShell({ user = null, onLogout }) {
           </div>
         </header>
 
-        <main className="page-content">
+        <main className={`page-content${pathname === "/clinical-assistant" ? " is-clinical-assistant" : ""}`}>
           <Outlet />
         </main>
       </div>
